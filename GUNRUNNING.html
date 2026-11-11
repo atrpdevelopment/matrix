@@ -1,0 +1,531 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nonogram</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #151619;
+  color: #d0d1d5;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.game {
+  width: 100%;
+  max-width: 520px;
+  min-height: 100vh;
+  background: #24272d;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  height: 44px;
+  border-bottom: 1px solid #41444b;
+  padding: 0 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  color: #ff97e5;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: .5px;
+}
+
+.abort {
+  font-size: 12px;
+  color: #858991;
+  cursor: pointer;
+}
+
+.status {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 22px;
+  font-size: 12px;
+  color: #969ba5;
+}
+
+.lives {
+  display: inline-flex;
+  gap: 5px;
+  margin-left: 5px;
+}
+
+.heart {
+  width: 11px;
+  height: 11px;
+  background: #ff97e5;
+  border-radius: 50%;
+}
+
+.heart.lost { background: #484b51; }
+
+.yellow { color: #ff97e5; font-weight: bold; }
+
+.board-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 12px;
+}
+
+.puzzle {
+  display: grid;
+  grid-template-columns: 65px repeat(6, 1fr);
+  grid-template-rows: 45px repeat(6, 1fr);
+  width: min(100%, 390px);
+  aspect-ratio: 1.12;
+}
+
+.corner { grid-area: 1 / 1; }
+
+.col-clue {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 7px;
+  gap: 5px;
+  flex-direction: column;
+  font-size: 12px;
+  line-height: 13px;
+  text-align: center;
+}
+
+.row-clue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cell {
+  background: #343a42;
+  border: 1px solid #484d55;
+  cursor: pointer;
+  position: relative;
+  transition: background .12s;
+  user-select: none;
+}
+
+.cell:hover { background: #454c56; }
+
+.cell.filled {
+  background: #ff97e5;
+}
+
+.cell.crossed::after {
+  content: "×";
+  color: #9299a4;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+}
+
+.cell.wrong {
+  background: #a83232;
+}
+
+.bottom {
+  padding: 18px 22px 24px;
+  text-align: center;
+}
+
+.instructions {
+  font-size: 12px;
+  color: #c4c6cb;
+  margin-bottom: 19px;
+}
+
+.progress-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.track {
+  height: 7px;
+  background: #454b54;
+  flex: 1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  width: 100%;
+  background: #ff97e5;
+  transition: width .2s;
+}
+
+.timer {
+  font-size: 11px;
+  color: #a2a6ae;
+  min-width: 38px;
+  text-align: right;
+}
+
+.overlay {
+  position: absolute;
+  inset: 44px 0 0;
+  background: rgba(20,22,26,.94);
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 25px;
+}
+
+.modal {
+  text-align: center;
+  max-width: 330px;
+}
+
+.modal h1 {
+  color: #ff97e5;
+  font-size: 25px;
+  letter-spacing: 2px;
+}
+
+.modal p {
+  color: #aeb2ba;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+button {
+  background: #ff97e5;
+  border: none;
+  color: #17191d;
+  font-weight: bold;
+  padding: 13px 35px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 15px;
+}
+
+button:hover { background: #ff3fcf; }
+
+.hidden { display: none; }
+
+@media(max-width: 400px) {
+  .puzzle {
+    grid-template-columns: 55px repeat(6, 1fr);
+    grid-template-rows: 42px repeat(6, 1fr);
+  }
+  .row-clue, .col-clue { font-size: 11px; }
+  .game { min-height: 100dvh; }
+}
+</style>
+</head>
+
+<body>
+<div class="game">
+
+<header>
+  <div class="logo">▦ Nonogram Puzzle</div>
+  <div class="abort" onclick="abortGame()">Esc to abort</div>
+</header>
+
+<div class="status">
+  <div>
+    Lives
+    <span class="lives" id="lives">
+      <span class="heart"></span>
+      <span class="heart"></span>
+      <span class="heart"></span>
+    </span>
+  </div>
+  <div>Filled <span class="yellow" id="count">0/0</span></div>
+</div>
+
+<div class="board-area">
+  <div class="puzzle" id="puzzle">
+    <div class="corner"></div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="instructions">
+    Left click fills a cell, right click crosses it out
+  </div>
+  <div class="progress-line">
+    <div class="track">
+      <div class="bar" id="bar"></div>
+    </div>
+    <div class="timer" id="timer">90.0s</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h1>ACCESS MATRIX</h1>
+    <p>
+      Complete the randomly generated 6×6 matrix by following the numbered clues.
+      <br><br>
+      You have <b>90 seconds</b> and <b>3 lives</b>.
+      <br><br>
+      Fill every correct cell to unlock the matrix. Each new game generates a different puzzle and clues.
+    </p>
+    <button onclick="startGame()">START GAME</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+const SIZE = 6;
+const GAME_TIME = 90;
+const STARTING_LIVES = 3;
+
+const puzzle = document.getElementById("puzzle");
+const overlay = document.getElementById("overlay");
+
+let solution = [];
+let rowClues = [];
+let colClues = [];
+let cells = [];
+let filled = 0;
+let totalFilled = 0;
+let lives = STARTING_LIVES;
+let timeLeft = GAME_TIME;
+let running = false;
+let timerInterval = null;
+
+function getLineClues(line) {
+  const clues = [];
+  let streak = 0;
+
+  for (const value of line) {
+    if (value === 1) {
+      streak++;
+    } else if (streak > 0) {
+      clues.push(streak);
+      streak = 0;
+    }
+  }
+
+  if (streak > 0) clues.push(streak);
+  return clues.length ? clues : [0];
+}
+
+function generatePuzzle() {
+  // Generate a fresh 6x6 pattern with a useful number of filled cells.
+  do {
+    solution = Array.from({ length: SIZE }, () =>
+      Array.from({ length: SIZE }, () => Math.random() < 0.48 ? 1 : 0)
+    );
+    totalFilled = solution.flat().reduce((sum, value) => sum + value, 0);
+  } while (totalFilled < 10 || totalFilled > 27);
+
+  rowClues = solution.map(row => getLineClues(row));
+  colClues = Array.from({ length: SIZE }, (_, col) =>
+    getLineClues(solution.map(row => row[col]))
+  );
+}
+
+function buildBoard() {
+  puzzle.innerHTML = '<div class="corner"></div>';
+  cells = [];
+
+  // Column clues
+  colClues.forEach((clue, c) => {
+    const el = document.createElement("div");
+    el.className = "col-clue";
+    el.style.gridColumn = c + 2;
+    el.style.gridRow = 1;
+    el.innerHTML = clue.map(n => `<span>${n}</span>`).join("");
+    puzzle.appendChild(el);
+  });
+
+  // Row clues and cells
+  rowClues.forEach((clue, r) => {
+    const label = document.createElement("div");
+    label.className = "row-clue";
+    label.style.gridColumn = 1;
+    label.style.gridRow = r + 2;
+    label.textContent = clue.join(" ");
+    puzzle.appendChild(label);
+
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.style.gridColumn = c + 2;
+      cell.style.gridRow = r + 2;
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.dataset.state = "empty";
+
+      cell.addEventListener("click", () => changeCell(r, c, "filled"));
+      cell.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        changeCell(r, c, "crossed");
+      });
+
+      puzzle.appendChild(cell);
+      cells.push(cell);
+    }
+  });
+
+  // Update the board's responsive grid dimensions.
+  puzzle.style.gridTemplateColumns = `65px repeat(${SIZE}, 1fr)`;
+  puzzle.style.gridTemplateRows = `45px repeat(${SIZE}, 1fr)`;
+}
+
+function changeCell(r, c, state) {
+  if (!running) return;
+
+  const cell = cells[r * SIZE + c];
+  const current = cell.dataset.state;
+  if (current === state) return;
+
+  if (current === "filled") filled--;
+
+  const correct = state === "filled"
+    ? solution[r][c] === 1
+    : solution[r][c] === 0;
+
+  if (!correct) {
+    if (current === "filled") filled++;
+    loseLife(cell);
+    return;
+  }
+
+  cell.dataset.state = state;
+  cell.classList.remove("filled", "crossed", "wrong");
+  cell.classList.add(state);
+
+  if (state === "filled") filled++;
+
+  updateUI();
+
+  if (filled === totalFilled) winGame();
+}
+
+function loseLife(cell) {
+  lives--;
+  cell.classList.add("wrong");
+
+  setTimeout(() => cell.classList.remove("wrong"), 250);
+  updateUI();
+
+  if (lives <= 0) {
+    endGame("GAME OVER", "You lost all 3 lives. Try a new random matrix!");
+  }
+}
+
+function updateUI() {
+  document.getElementById("count").textContent = `${filled}/${totalFilled}`;
+
+  document.getElementById("lives").innerHTML =
+    Array.from({ length: STARTING_LIVES }, (_, i) =>
+      `<span class="heart ${i >= lives ? "lost" : ""}"></span>`
+    ).join("");
+
+  document.getElementById("bar").style.width =
+    (timeLeft / GAME_TIME * 100) + "%";
+
+  document.getElementById("timer").textContent =
+    timeLeft.toFixed(1) + "s";
+}
+
+function startGame() {
+  clearInterval(timerInterval);
+
+  generatePuzzle();
+  buildBoard();
+
+  filled = 0;
+  lives = STARTING_LIVES;
+  timeLeft = GAME_TIME;
+  running = true;
+
+  overlay.classList.add("hidden");
+  updateUI();
+
+  let lastTime = Date.now();
+  timerInterval = setInterval(() => {
+    const now = Date.now();
+    const elapsed = (now - lastTime) / 1000;
+    lastTime = now;
+
+    timeLeft = Math.max(0, timeLeft - elapsed);
+    updateUI();
+
+    if (timeLeft <= 0) {
+      endGame("TIME'S UP!", "The 90-second countdown has ended.");
+    }
+  }, 50);
+}
+
+function endGame(title, message) {
+  running = false;
+  clearInterval(timerInterval);
+
+  overlay.classList.remove("hidden");
+  overlay.innerHTML = `
+    <div class="modal">
+      <h1>${title}</h1>
+      <p>${message}<br><br>
+      Matrix progress: <b>${filled}/${totalFilled}</b></p>
+      <button onclick="startGame()">NEW RANDOM PUZZLE</button>
+    </div>
+  `;
+}
+
+function winGame() {
+  running = false;
+  clearInterval(timerInterval);
+
+  overlay.classList.remove("hidden");
+  overlay.innerHTML = `
+    <div class="modal">
+      <h1>ACCESS GRANTED</h1>
+      <p>
+        Matrix successfully unlocked!
+        <br><br>
+        Time remaining: <b>${timeLeft.toFixed(1)}s</b>
+        <br>
+        Lives remaining: <b>${lives}</b>
+      </p>
+      <button onclick="startGame()">NEW RANDOM PUZZLE</button>
+    </div>
+  `;
+}
+
+function abortGame() {
+  if (!running) return;
+  endGame("ABORTED", "You terminated the access attempt.");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") abortGame();
+});
+
+// Prepare a random puzzle before the player starts.
+generatePuzzle();
+buildBoard();
+updateUI();
+</script>
+</body>
+</html>
